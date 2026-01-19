@@ -25,6 +25,12 @@
 #include "Entity.hpp"
 #include "MathUtils.hpp"
 #include "Enemy.hpp"
+#include "Particle.hpp"
+#include "Solver.hpp"
+#include "Item.hpp"
+#include "Items.hpp"
+#include <memory>
+#include "Level.hpp"
 
 
 
@@ -145,188 +151,6 @@ public:
 	}
 };
 
-// solves collisions with boundaries of the map and applys movement and visual style for the particle
-struct Particle {
-	sf::Vector2f position;
-	sf::Vector2f position_last;
-	sf::Vector2f acceleration;
-	float radius = 6.0f;
-	sf::CircleShape shape;
-
-	void solveBoundaries(const sf::RectangleShape& rect) {
-		float r = shape.getRadius();
-
-		float outline = rect.getOutlineThickness();
-
-		// Compute top-left and bottom-right based on origin and size
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin() - sf::Vector2f(outline, outline);
-		sf::Vector2f rectBottomRight = rectTopLeft + rect.getSize() + sf::Vector2f(outline * 2.f, outline * 2.f);
-
-		float b = 0.95f; // bounce factor
-
-		// LEFT boundary
-		if (position.x - r < rectTopLeft.x) {
-			position.x = rectTopLeft.x + r;
-			position_last.x = position.x + (position_last.x - position.x) * -b;
-		}
-		// RIGHT boundary
-		if (position.x + r > rectBottomRight.x) {
-			position.x = rectBottomRight.x - r;
-			position_last.x = position.x + (position_last.x - position.x) * -b;
-		}
-		// TOP boundary
-		if (position.y - r < rectTopLeft.y) {
-			position.y = rectTopLeft.y + r;
-			position_last.y = position.y + (position_last.y - position.y) * -b;
-		}
-		// BOTTOM boundary
-		if (position.y + r > rectBottomRight.y) {
-			position.y = rectBottomRight.y - r;
-			position_last.y = position.y + (position_last.y - position.y) * -b;
-		}
-	
-	}
-
-	Particle() = default;
-	Particle(sf::Vector2f position_, float radius_)
-		: position{ position_ }, position_last{ position_ }, acceleration{ 0.f, 0.f }, radius{ radius_ }
-	{
-		shape.setRadius(radius);
-		shape.setFillColor(sf::Color(0, 150, 255, 255));
-		shape.setPosition(position);
-	}
-
-	void update(float dt) {
-		float damping = 0.99f;
-		sf::Vector2f displacement = (position - position_last) * damping;
-		position_last = position;
-		position = position + displacement + acceleration * (dt * dt);
-		acceleration = {};
-		shape.setPosition(position);
-	}
-
-	void applyAcceleration(sf::Vector2f a) { acceleration += a; }
-	void setVelocity(sf::Vector2f v, float dt) { position_last = position - (v * dt); }
-	void addVelocity(sf::Vector2f v, float dt) { position_last -= v * dt; }
-	sf::Vector2f getVelocity() { return position - position_last; }
-};
-
-
-/// <summary>
-///  Uses grid hashing to check collision, instead of checking the hole screen for collisions with every other particle each frame it only checks the ones that are in side of the same hash for the particle
-/// </summary>
-class Solver {
-public:
-	struct SpatialHashGrid {
-		float cellSize;
-		std::unordered_map<long long, std::vector<int>> grid;
-		SpatialHashGrid(float cellSize_) : cellSize(cellSize_) {}
-		long long hash(int x, int y) const { return ((long long)x << 32) ^ (long long)(y); }
-		sf::Vector2i worldToCell(const sf::Vector2f& pos, const sf::Vector2f& rectTopLeft) const {
-			sf::Vector2f relativePos = pos - rectTopLeft;
-			return sf::Vector2i((int)std::floor(relativePos.x / cellSize), (int)std::floor(relativePos.y / cellSize));
-		}
-		void insert(const sf::Vector2f& pos, int index, const sf::Vector2f& rectTopLeft) {
-			sf::Vector2i cell = worldToCell(pos, rectTopLeft);
-			long long key = hash(cell.x, cell.y);
-			grid[key].push_back(index);
-		}
-		void clear() { grid.clear(); }
-	};
-
-	Solver() = default;
-	SpatialHashGrid hashGrid{ 45.0f };
-	Particle& addObject(sf::Vector2f position, float radius) { Particle newParticle(position, radius); return objects.emplace_back(newParticle); }
-
-	void update(const sf::RectangleShape& rect) {
-		applyGravity();
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
-		hashGrid.clear();
-		for (int i = 0; i < objects.size(); ++i) hashGrid.insert(objects[i].position, i, rectTopLeft);
-
-		for (int i = 0; i < 3; ++i) {
-			for (auto& obj : objects) { obj.solveBoundaries(rect); obj.update(step_dt); }
-			checkCollisionsSpatial(rect);
-		}
-	}
-
-	void drawGrid(const sf::RectangleShape& rect, sf::RenderWindow& window) {
-		float cellSize = hashGrid.cellSize;
-		sf::RectangleShape cellOutline;
-		cellOutline.setSize(sf::Vector2f(cellSize, cellSize));
-		cellOutline.setFillColor(sf::Color::Transparent);
-		cellOutline.setOutlineColor(sf::Color(60, 60, 60, 120));
-		cellOutline.setOutlineThickness(1.f);
-
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
-		int startCol = 0;
-		int endCol = static_cast<int>(std::ceil(rect.getSize().x / cellSize));
-		int startRow = 0;
-		int endRow = static_cast<int>(std::ceil(rect.getSize().y / cellSize));
-
-		for (int x = startCol; x < endCol; x++) {
-			for (int y = startRow; y < endRow; y++) {
-				cellOutline.setPosition(rectTopLeft + sf::Vector2f(x * cellSize, y * cellSize));
-				window.draw(cellOutline);
-			}
-		}
-	}
-
-	std::vector<Particle>& getObjects() { return objects; }
-
-private:
-	std::vector<Particle> objects;
-	sf::Vector2f gravity = { 0.0f, 800 };
-	float step_dt = 1.0f / 120;
-
-	void applyGravity() { for (auto& obj : objects) obj.applyAcceleration(gravity); }
-
-	void checkCollisionsSpatial(const sf::RectangleShape& rect) {
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
-		sf::Vector2f rectBottomRight = rectTopLeft + rect.getSize();
-
-		for (auto& [key, cellParticles] : hashGrid.grid) {
-			int cx = static_cast<int>(key >> 32);
-			int cy = static_cast<int>(key & 0xFFFFFFFF);
-
-			float cellLeft = rectTopLeft.x + cx * hashGrid.cellSize;
-			float cellRight = cellLeft + hashGrid.cellSize;
-			float cellTop = rectTopLeft.y + cy * hashGrid.cellSize;
-			float cellBottom = cellTop + hashGrid.cellSize;
-
-			if (cellRight < rectTopLeft.x || cellLeft > rectBottomRight.x || cellBottom < rectTopLeft.y || cellTop > rectBottomRight.y) continue;
-
-			for (int dx = -1; dx <= 1; ++dx) {
-				for (int dy = -1; dy <= 1; ++dy) {
-					long long neighborKey = hashGrid.hash(cx + dx, cy + dy);
-					auto it = hashGrid.grid.find(neighborKey);
-					if (it == hashGrid.grid.end()) continue;
-
-					const auto& neighborParticles = it->second;
-					for (int i : cellParticles) {
-						Particle& obj1 = objects[i];
-						for (int j : neighborParticles) {
-							if (j <= i) continue;
-							Particle& obj2 = objects[j];
-							sf::Vector2f v = obj1.position - obj2.position;
-							float dist = sqrt(v.x * v.x + v.y * v.y);
-							float min_dist = obj1.radius + obj2.radius;
-							if (dist < min_dist) {
-								sf::Vector2f n = dist > 0.0001f ? v / dist : sf::Vector2f(1.f, 0.f);
-								float delta = 0.8f * (min_dist - dist);
-								obj1.position += n * 0.5f * delta;
-								obj2.position -= n * 0.5f * delta;
-								float damping = 0.99f;
-								obj1.position_last = obj1.position - (obj1.position - obj1.position_last) * damping;
-								obj2.position_last = obj2.position - (obj2.position - obj2.position_last) * damping;
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-};
 
 
 // ------------------- Globals -------------------
@@ -346,81 +170,8 @@ char** map = nullptr;
 // Collection of walls for cave collision detection for the player
 std::vector<class Wall> walls;
 
-
-
 // Global player instance
 Player playa(20.f, 20.f);
-
-
-// ------------------- Items -------------------
-// Base class for collectible items
-class Item {
-public:
-	sf::Vector2f position;
-	sf::RectangleShape shape;
-	bool collected = false;
-
-	Item(sf::Vector2f pos, sf::Color color, float size = 15.f) : position(pos) {
-		shape.setSize({ size, size });
-		shape.setFillColor(color);
-		shape.setPosition(position);
-	}
-
-	virtual void applyEffect(Player& player) = 0;
-};
-
-// Health-restoring item
-class HydraMineral : public Item {
-public:
-	HydraMineral(sf::Vector2f pos) : Item(pos, sf::Color::Yellow) {}
-	void applyEffect(Player& player) override {
-		player.health = std::min(player.health + 5, 100);
-	}
-};
-
-// Oxygen-restoring item
-class Oxygen : public Item {
-public:
-	Oxygen(sf::Vector2f pos) : Item(pos, sf::Color::White) {}
-	void applyEffect(Player& player) override {
-		player.oxygenTime = std::min(player.oxygenTime + 10.f, 30.f);
-	}
-};
-
-// ------------------- Level -------------------
-// Handles level data, maps, and collectibles
-class Level {
-public:
-	bool customMapFile = false;
-	std::string customMapFileName;
-	sf::RectangleShape bounds; // world boundary rectangle
-	std::vector<Enemy> enemies;
-	std::vector<Item*> items;
-	std::vector<std::string> mapFiles = { "lvl1.txt", "lvl2.txt", "lvl3.txt" };
-	int currentMapIndex = 0;
-	bool requestCloseRender = false;
-
-	int getTotalTreasures() const {
-		return static_cast<int>(items.size());
-	}
-
-	int getCollectedTreasures() const {
-		int count = 0;
-		for (auto& item : items)
-			if (item->collected) count++;
-		return count;
-	}
-
-	void resetCollectedTreasures() {
-		for (auto& item : items)
-			item->collected = false;
-	}
-
-	// Access player's total treasure count
-	int& addCollectedToTotal(Player& playa) {
-		return playa.totalTreasuresCollected;
-	}
-};
 
 // ------------------- Function declarations -------------------
 void start_splash_screen(Level& currentLevel);
@@ -503,9 +254,7 @@ void load_level(Level& currentLevel, Enemy& enemy)
 		map = nullptr;
 	}
 
-	// Delete old items
-	for (auto& item : currentLevel.items)
-		delete item;
+	
 	currentLevel.items.clear();
 
 	// Clear enemies and walls
@@ -704,9 +453,7 @@ void resetMap(Level& currentLevel, Enemy& enemy)
 		map = nullptr;
 	}
 
-	// Delete all items
-	for (auto& item : currentLevel.items)
-		delete item;
+
 	currentLevel.items.clear();
 
 	// Clear enemies and walls
@@ -1067,7 +814,7 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 					rectTopLeft.x + j * cellSize + cellSize / 2.f,
 					rectTopLeft.y + i * cellSize + cellSize / 2.f
 				);
-				currentLevel.items.push_back(new HydraMineral(itemPos));
+				currentLevel.items.push_back(std::make_unique<HydraMineral>(itemPos));
 			}
 			else if (cell == 'O') { // Oxygen
 				// rectangle top-left position in window coordinates
@@ -1078,7 +825,7 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 					rectTopLeft.y + i * cellSize + cellSize / 2.f
 				);
 
-				currentLevel.items.push_back(new Oxygen(itemPos));
+				currentLevel.items.push_back(std::make_unique<Oxygen>(itemPos));
 			}
 
 			else if (cell == 'o') { //if the cell is o we spawn int particlesPerCell amount of particles currently 4 randomly with in the boundaries
@@ -1153,10 +900,7 @@ void quit_routines(Level& currentLevel)
 			map = nullptr;         // good practice to avoid dangling pointer
 		}
 
-		// Free dynamically allocated Item objects
-		for (auto& item : currentLevel.items) {
-			delete item;
-		}
+		
 		currentLevel.items.clear();
 
 		// Clear walls vector (automatic cleanup)

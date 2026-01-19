@@ -135,16 +135,25 @@
   <ItemGroup>
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="Item.cpp" />
+    <ClCompile Include="Level.cpp" />
     <ClCompile Include="MathUtils.cpp" />
+    <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="SFMLTest.cpp" />
+    <ClCompile Include="Solver.cpp" />
     <ClCompile Include="Wall.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Enemy.hpp" />
     <ClInclude Include="Entity.hpp" />
+    <ClInclude Include="Item.hpp" />
+    <ClInclude Include="Items.hpp" />
+    <ClInclude Include="Level.hpp" />
     <ClInclude Include="MathUtils.hpp" />
+    <ClInclude Include="Particle.hpp" />
     <ClInclude Include="Player.hpp" />
+    <ClInclude Include="Solver.hpp" />
     <ClInclude Include="Wall.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
