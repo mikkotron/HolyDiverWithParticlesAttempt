@@ -20,6 +20,11 @@
 #include <unordered_map>
 #include <optional>
 #include <sstream>
+#include "Player.hpp"
+#include "Wall.hpp"
+#include "Entity.hpp"
+#include "MathUtils.hpp"
+#include "Enemy.hpp"
 
 
 
@@ -151,36 +156,35 @@ struct Particle {
 	void solveBoundaries(const sf::RectangleShape& rect) {
 		float r = shape.getRadius();
 
-		float outlineHalf = rect.getOutlineThickness() / 2.f;
 		float outline = rect.getOutlineThickness();
 
-		float left = rect.getPosition().x - rect.getSize().x / 2.f - outline;
-		float right = rect.getPosition().x + rect.getSize().x / 2.f + outlineHalf;
-		float top = rect.getPosition().y - rect.getSize().y / 2.f - outline;
-		float bottom = rect.getPosition().y + rect.getSize().y / 2.f + outlineHalf;
+		// Compute top-left and bottom-right based on origin and size
+		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin() - sf::Vector2f(outline, outline);
+		sf::Vector2f rectBottomRight = rectTopLeft + rect.getSize() + sf::Vector2f(outline * 2.f, outline * 2.f);
 
 		float b = 0.95f; // bounce factor
 
 		// LEFT boundary
-		if (position.x - r < left) {
-			position.x = left + r;
+		if (position.x - r < rectTopLeft.x) {
+			position.x = rectTopLeft.x + r;
 			position_last.x = position.x + (position_last.x - position.x) * -b;
 		}
 		// RIGHT boundary
-		if (position.x + r > right) {
-			position.x = right - r;
+		if (position.x + r > rectBottomRight.x) {
+			position.x = rectBottomRight.x - r;
 			position_last.x = position.x + (position_last.x - position.x) * -b;
 		}
 		// TOP boundary
-		if (position.y - r < top) {
-			position.y = top + r;
+		if (position.y - r < rectTopLeft.y) {
+			position.y = rectTopLeft.y + r;
 			position_last.y = position.y + (position_last.y - position.y) * -b;
 		}
 		// BOTTOM boundary
-		if (position.y + r > bottom) {
-			position.y = bottom - r;
+		if (position.y + r > rectBottomRight.y) {
+			position.y = rectBottomRight.y - r;
 			position_last.y = position.y + (position_last.y - position.y) * -b;
 		}
+	
 	}
 
 	Particle() = default;
@@ -236,7 +240,7 @@ public:
 
 	void update(const sf::RectangleShape& rect) {
 		applyGravity();
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getSize() / 2.f;
+		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
 		hashGrid.clear();
 		for (int i = 0; i < objects.size(); ++i) hashGrid.insert(objects[i].position, i, rectTopLeft);
 
@@ -254,7 +258,7 @@ public:
 		cellOutline.setOutlineColor(sf::Color(60, 60, 60, 120));
 		cellOutline.setOutlineThickness(1.f);
 
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getSize() / 2.f;
+		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
 		int startCol = 0;
 		int endCol = static_cast<int>(std::ceil(rect.getSize().x / cellSize));
 		int startRow = 0;
@@ -278,8 +282,8 @@ private:
 	void applyGravity() { for (auto& obj : objects) obj.applyAcceleration(gravity); }
 
 	void checkCollisionsSpatial(const sf::RectangleShape& rect) {
-		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getSize() / 2.f;
-		sf::Vector2f rectBottomRight = rect.getPosition() + rect.getSize() / 2.f;
+		sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
+		sf::Vector2f rectBottomRight = rectTopLeft + rect.getSize();
 
 		for (auto& [key, cellParticles] : hashGrid.grid) {
 			int cx = static_cast<int>(key >> 32);
@@ -325,31 +329,9 @@ private:
 };
 
 
-// ------------------- Wall -------------------
-// Simple static wall object used for collision and rendering
-class Wall {
-public:
-	sf::RectangleShape shape;
-
-	// Construct a wall with position and size
-	Wall(float x, float y, float width, float height) {
-		shape.setSize({ width, height });
-		shape.setFillColor(sf::Color::Blue);
-		shape.setPosition({ x, y });
-	}
-
-	// Draw wall to render window
-	void draw(sf::RenderWindow& window) {
-		window.draw(shape);
-	}
-};
-
 // ------------------- Globals -------------------
 // Toggle for particle simulation mode
 bool openParticleSim = false;
-
-// Bounding rectangle for gameplay area
-sf::RectangleShape rectangle;
 
 // Particle physics solver
 Solver particleSolver;
@@ -364,243 +346,12 @@ char** map = nullptr;
 // Collection of walls for cave collision detection for the player
 std::vector<class Wall> walls;
 
-// ------------------- Entity / Player / Enemy -------------------
-// Base class for all entities that have health and position also handles the boundarie collisions
-class Entity {
-public:
-	int health = 100;
-	int x = 0, y = 0;
 
-	// Clamp an object inside a rectangular boundary
-	sf::Vector2f clampInsideRect(
-		const sf::Vector2f& pos,
-		const sf::Vector2f& size,
-		const sf::RectangleShape& bounds
-	) {
-		sf::Vector2f topLeft = bounds.getPosition() - bounds.getSize() / 2.f;
-		sf::Vector2f bottomRight = bounds.getPosition() + bounds.getSize() / 2.f;
-		sf::Vector2f halfSize = size / 2.f;
-		sf::Vector2f clamped = pos;
-
-		if (clamped.x - halfSize.x < topLeft.x) clamped.x = topLeft.x + halfSize.x;
-		if (clamped.x + halfSize.x > bottomRight.x) clamped.x = bottomRight.x - halfSize.x;
-		if (clamped.y - halfSize.y < topLeft.y) clamped.y = topLeft.y + halfSize.y;
-		if (clamped.y + halfSize.y > bottomRight.y) clamped.y = bottomRight.y - halfSize.y;
-
-		return clamped;
-	}
-};
-
-// ------------------- Player -------------------
-// Player-controlled entity
-class Player : public Entity {
-public:
-	float oxygenTime = 30.0f;        // Remaining oxygen
-	int deaths = 0;                 // Death counter
-	int totalTreasuresCollected = 0;
-
-	// Create player with given size
-	Player(int x = 0, int y = 0, float sizeX = 20.f, float sizeY = 20.f) {
-		rect.setSize(sf::Vector2f(sizeX, sizeY));
-		up = down = left = right = false;
-	}
-
-	// Set player position
-	void setPosition(const sf::Vector2f& pos) {
-		rect.setPosition(pos);
-	}
-
-	// Set player color
-	void setFillColor(const sf::Color& color) {
-		rect.setFillColor(color);
-	}
-
-	// Handle keyboard input
-	void ProcessEvents(sf::Keyboard::Key key, bool checkPressed) {
-		switch (key) {
-		case sf::Keyboard::Key::W: up = checkPressed; break;
-		case sf::Keyboard::Key::S: down = checkPressed; break;
-		case sf::Keyboard::Key::A: left = checkPressed; break;
-		case sf::Keyboard::Key::D: right = checkPressed; break;
-		}
-	}
-
-	// Update player movement and collisions
-	void update(const std::vector<class Wall>& walls) {
-		sf::Vector2f movement;
-		if (up) movement.y -= 2.f;
-		if (down) movement.y += 2.f;
-		if (left) movement.x -= 2.f;
-		if (right) movement.x += 2.f;
-
-		rect.move(movement);
-		rect.setPosition(clampInsideRect(rect.getPosition(), rect.getSize(), rectangle));
-		resolveCollisions(walls);
-	}
-
-	// Draw player
-	void drawTo(sf::RenderWindow& window) {
-		window.draw(rect);
-	}
-
-	// Axis-aligned bounding box collision check
-	bool checkCollision(const sf::RectangleShape& wallShape) {
-		sf::Vector2f playerPos = rect.getPosition();
-		sf::Vector2f playerHalf = rect.getSize() / 2.f;
-		sf::Vector2f wallPos = wallShape.getPosition();
-		sf::Vector2f wallHalf = wallShape.getSize() / 2.f;
-
-		return (abs(playerPos.x - wallPos.x) < (playerHalf.x + wallHalf.x)) &&
-			(abs(playerPos.y - wallPos.y) < (playerHalf.y + wallHalf.y));
-	}
-
-	// Resolve collisions with walls by separating overlapping axes
-	void resolveCollisions(const std::vector<class Wall>& walls) {
-		sf::Vector2f playerPos = rect.getPosition();
-		sf::Vector2f playerHalf = rect.getSize() / 2.f;
-
-		for (auto& wall : walls) {
-			sf::Vector2f wallPos = wall.shape.getPosition();
-			sf::Vector2f wallHalf = wall.shape.getSize() / 2.f;
-
-			if (checkCollision(wall.shape)) {
-				sf::Vector2f delta = playerPos - wallPos;
-				float overlapX = (playerHalf.x + wallHalf.x) - abs(delta.x);
-				float overlapY = (playerHalf.y + wallHalf.y) - abs(delta.y);
-
-				if (overlapX < overlapY)
-					playerPos.x += delta.x > 0 ? overlapX : -overlapX;
-				else
-					playerPos.y += delta.y > 0 ? overlapY : -overlapY;
-
-				rect.setPosition(playerPos);
-			}
-		}
-	}
-
-	// Get current position
-	sf::Vector2f getPosition() const {
-		return rect.getPosition();
-	}
-
-	// Apply damage and handle death
-	void takeDamage(int damage, sf::RenderWindow& window) {
-		health -= damage;
-		if (health < 0) health = 0;
-
-		if (health == 0) {
-			std::cout << std::endl << "PLAYER DIED!\n";
-			deaths++;
-			window.close();
-		}
-	}
-
-	// Check if player is dead
-	bool isDead() const {
-		return health <= 0;
-	}
-
-	// Reset player state
-	void reset() {
-		health = 100;
-		oxygenTime = 30.0f;
-		up = down = left = right = false;
-	}
-
-private:
-	sf::RectangleShape rect;
-	bool up, down, left, right;
-};
 
 // Global player instance
-Player playa(0, 0, 20.f, 20.f);
+Player playa(20.f, 20.f);
 
 
-// ------------------- Enemy -------------------
-// Enemy entity with two movement behaviors
-class Enemy : public Entity {
-public:
-	enum class Type { Moving, Oscillating };
-	Type type = Type::Moving;
-
-	std::vector<Enemy> enemies;
-	int id;
-
-	sf::Vector2f pos;
-	float speed = 70.f;
-	sf::RectangleShape shape;
-
-	float damageCooldown = 1.0f;
-	sf::Clock damageClock;
-
-	sf::Vector2f randomOffset;
-
-	// Oscillation parameters
-	float oscillationAmplitude = 50.f;
-	float oscillationSpeed = 2.f;
-	sf::Vector2f startPos;
-
-	// Construct enemy
-	Enemy(int x, int y, int id_, Type t = Type::Moving) : id(id_), type(t) {
-		pos = sf::Vector2f((float)x, (float)y);
-		startPos = pos;
-
-		shape.setSize({ 20.f, 20.f });
-		shape.setFillColor(type == Type::Moving ? sf::Color::Red : sf::Color::Blue);
-		shape.setPosition(pos);
-
-		// Random offset for moving enemies
-		if (type == Type::Moving) {
-			float maxOffset = 10.f;
-			randomOffset = sf::Vector2f(
-				static_cast<float>((rand() % (int)maxOffset) - maxOffset / 2),
-				static_cast<float>((rand() % (int)maxOffset) - maxOffset / 2)
-			);
-		}
-	}
-
-	// Update enemy behavior and damage player if close
-	void update(float dt, const sf::Vector2f& playerPos, sf::RenderWindow& window, Player& playa) {
-		static sf::Clock clock;
-		float time = clock.getElapsedTime().asSeconds();
-
-		if (type == Type::Oscillating) {
-			pos.y = startPos.y + std::sin(time * oscillationSpeed) * oscillationAmplitude;
-			shape.setPosition(pos);
-		}
-		else {
-			float wiggleStrength = 80.f;
-			sf::Vector2f noiseOffset(
-				std::sin(time + id) * wiggleStrength,
-				std::cos(time + id) * wiggleStrength
-			);
-
-			sf::Vector2f target = playerPos + noiseOffset;
-			sf::Vector2f dir = target - pos;
-			float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-			if (length > 0.f) dir /= length;
-
-			pos += dir * speed * dt;
-			pos = clampInsideRect(pos, shape.getSize(), rectangle);
-			shape.setPosition(pos);
-		}
-
-		float distance = std::sqrt(
-			std::pow(playerPos.x - pos.x, 2.f) +
-			std::pow(playerPos.y - pos.y, 2.f)
-		);
-
-		if (distance <= 30.f && damageClock.getElapsedTime().asSeconds() >= damageCooldown) {
-			playa.takeDamage(5, window);
-			damageClock.restart();
-		}
-	}
-
-	// Draw enemy
-	void draw(sf::RenderWindow& window) {
-		window.draw(shape);
-	}
-};
 // ------------------- Items -------------------
 // Base class for collectible items
 class Item {
@@ -642,7 +393,8 @@ class Level {
 public:
 	bool customMapFile = false;
 	std::string customMapFileName;
-
+	sf::RectangleShape bounds; // world boundary rectangle
+	std::vector<Enemy> enemies;
 	std::vector<Item*> items;
 	std::vector<std::string> mapFiles = { "lvl1.txt", "lvl2.txt", "lvl3.txt" };
 	int currentMapIndex = 0;
@@ -691,7 +443,7 @@ char input;
 int main(void)
 {
 	Level currentLevel;
-	Enemy enemy(200, 200, 0);
+	Enemy enemy({ 200.f, 200.f }, 0);
 
 	// Show splash screen and instructions
 	start_splash_screen(currentLevel);
@@ -757,7 +509,7 @@ void load_level(Level& currentLevel, Enemy& enemy)
 	currentLevel.items.clear();
 
 	// Clear enemies and walls
-	enemy.enemies.clear();
+	currentLevel.enemies.clear();
 	walls.clear();
 
 	rows = 0;
@@ -958,7 +710,7 @@ void resetMap(Level& currentLevel, Enemy& enemy)
 	currentLevel.items.clear();
 
 	// Clear enemies and walls
-	enemy.enemies.clear();
+	currentLevel.enemies.clear();
 	walls.clear();
 
 	// Reset map dimensions
@@ -983,12 +735,23 @@ void resetMap(Level& currentLevel, Enemy& enemy)
  **************************************************************/
 void render_screen(Level& currentLevel, Enemy& enemy)
 {
+	
+
+
 	unsigned int width = 800;
 	unsigned int height = 800;
 
 	sf::VideoMode mode(sf::Vector2u(width, height));
 	sf::RenderWindow window(mode, "Holy Diver");
 	window.setFramerateLimit(60);
+
+	// Set death callback once
+	playa.onDeath = [&]() {
+		std::cout << "PLAYER DIED!\n";
+		playa.deaths++;
+		openParticleSim = false;
+		window.close();
+		};
 
 	while (window.isOpen()) {
 		std::optional<sf::Event> eventOpt;
@@ -1034,12 +797,12 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 
 			// Key pressed
 			if (auto* keyEvent = event.getIf<sf::Event::KeyPressed>()) {
-				playa.ProcessEvents(keyEvent->code, true);
+				playa.handleInput(keyEvent->code, true);
 			}
 
 			// Key released
 			if (auto* keyEvent = event.getIf<sf::Event::KeyReleased>()) {
-				playa.ProcessEvents(keyEvent->code, false);
+				playa.handleInput(keyEvent->code, false);
 			}
 		}
 
@@ -1052,7 +815,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 			// Clamp oxygen to zero and apply damage
 			if (playa.oxygenTime < 0.f) {
 				playa.oxygenTime = 0.f;
-				playa.takeDamage(2, window);
+				playa.takeDamage(2);
 			}
 
 			oxygenClock.restart();
@@ -1068,12 +831,12 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		/********************
 		 * UPDATE & RENDER
 		 ********************/
-		particleSolver.update(rectangle);
+		particleSolver.update(currentLevel.bounds);
 
 		window.clear(sf::Color(20, 20, 40));
 
 		// Draw map border
-		window.draw(rectangle);
+		window.draw(currentLevel.bounds);
 
 		// Draw walls
 		for (auto& wall : walls) {
@@ -1087,19 +850,21 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		}
 
 		// Update and draw enemies
-		for (auto& e : enemy.enemies) {
-			e.update(dt, playa.getPosition(), window, playa);
-			e.draw(window);
+		for (auto& e : currentLevel.enemies) {
+			e.update(walls, currentLevel.bounds);  // movement + collisions
+			e.updateAI(dt, playa);          // chasing, oscillation, damage
+			e.draw(window);                 // render
 		}
+
 
 		// Draw particles
 		for (Particle& p : particleSolver.getObjects())
 			window.draw(p.shape);
 
-		particleSolver.drawGrid(rectangle, window);
+		particleSolver.drawGrid(currentLevel.bounds, window);
 
 		// Update player physics and collisions
-		playa.update(walls);
+		playa.update(walls, currentLevel.bounds);
 
 		/********************
 		 * ITEM PICKUPS
@@ -1166,7 +931,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		}
 
 		// Draw player last (on top)
-		playa.drawTo(window);
+		playa.draw(window);
 
 		window.display();
 	}
@@ -1261,9 +1026,9 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 	unsigned int height = 840;
 
 	// rectangle will be adjusted in load_level based on 'x' tiles
-	rectangle.setFillColor(sf::Color::Black);
-	rectangle.setOutlineThickness(5.0f);
-	rectangle.setOutlineColor(sf::Color::Blue);
+	currentLevel.bounds.setFillColor(sf::Color::Black);
+	currentLevel.bounds.setOutlineThickness(5.0f);
+	currentLevel.bounds.setOutlineColor(sf::Color::Blue);
 	
 	playa.setFillColor(sf::Color::Green);
 
@@ -1281,21 +1046,23 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 			float y = i * cellSize + cellSize / 2.f; // same as the earlier but for i
 
 			if (cell == 'x') { // if the cell is oocupied by x we use rectangle to create the map boundaries
-				rectangle.setSize(sf::Vector2f(cols * cellSize, rows * cellSize));
-				rectangle.setOrigin(rectangle.getSize() / 2.f);
-				rectangle.setPosition(sf::Vector2f(width / 2.f, height / 2.f));
+				// Set world bounds for clamping
+				currentLevel.bounds.setSize(sf::Vector2f(cols * cellSize, rows * cellSize));
+				currentLevel.bounds.setOrigin(currentLevel.bounds.getSize() / 2.f);
+				currentLevel.bounds.setPosition(sf::Vector2f(width / 2.f, height / 2.f));
 
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
+				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
 
 				sf::Vector2f wallPos(
-					rectTopLeft.x + j * cellSize,
-					rectTopLeft.y + i * cellSize);
-
+					rectTopLeft.x + j * cellSize + cellSize / 2.f,
+					rectTopLeft.y + i * cellSize + cellSize / 2.f
+				);
 				walls.emplace_back(wallPos.x, wallPos.y, cellSize, cellSize);
+
 			}
 			else if (cell == 'B') { // Hydra Mineral
 				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
+				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
 				sf::Vector2f itemPos(
 					rectTopLeft.x + j * cellSize + cellSize / 2.f,
 					rectTopLeft.y + i * cellSize + cellSize / 2.f
@@ -1304,13 +1071,16 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 			}
 			else if (cell == 'O') { // Oxygen
 				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
+				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
+
 				sf::Vector2f itemPos(
 					rectTopLeft.x + j * cellSize + cellSize / 2.f,
 					rectTopLeft.y + i * cellSize + cellSize / 2.f
 				);
+
 				currentLevel.items.push_back(new Oxygen(itemPos));
 			}
+
 			else if (cell == 'o') { //if the cell is o we spawn int particlesPerCell amount of particles currently 4 randomly with in the boundaries
 				for (int p = 0; p < particlesPerCell; p++) {
 					// small random offset within the cell
@@ -1320,43 +1090,41 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
 					particleSolver.addObject(sf::Vector2f(x + offsetX, y + offsetY), 7.f);
 				}
 			}
-			else if (cell=='P') {// if the cell is P create a square to represent the player
+			else if (cell == 'P') { // Player spawn
 				spawn_x = i;
 				spawn_y = j;
-				playa.x = spawn_x;
-				playa.y = spawn_y;
 
 				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
-				
-				// Place player in the **center of the P-cell**
+				sf::Vector2f rectTopLeft =
+					currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
+
+				// Place player in the center of the P-cell
 				float cellSize = 20.f;
 				playa.setPosition(sf::Vector2f(
 					rectTopLeft.x + spawn_y * cellSize + cellSize / 2.f,
 					rectTopLeft.y + spawn_x * cellSize + cellSize / 2.f
 				));
 			}
-			else if (cell == 'E') { // spawn regular moving enemy
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
+
+			else if (cell == 'E') {
 				sf::Vector2f enemyPos(
-					rectTopLeft.x + j * cellSize + cellSize / 2.f,
-					rectTopLeft.y + i * cellSize + cellSize / 2.f
+					currentLevel.bounds.getPosition().x - currentLevel.bounds.getSize().x / 2.f + j * cellSize + cellSize / 2.f,
+					currentLevel.bounds.getPosition().y - currentLevel.bounds.getSize().y / 2.f + i * cellSize + cellSize / 2.f
 				);
-				int enemyID = static_cast<int>(enemy.enemies.size()); // unique ID per enemy
-				// spawn as normal moving enemy
-				enemy.enemies.emplace_back(static_cast<int>(enemyPos.x), static_cast<int>(enemyPos.y), enemyID, Enemy::Type::Moving);
+				int enemyID = static_cast<int>(currentLevel.enemies.size());
+				currentLevel.enemies.emplace_back(enemyPos, enemyID, Enemy::Type::Moving);
 			}
-			else if (cell == 'S') { // spawn oscillating enemy
-				sf::Vector2f rectTopLeft = rectangle.getPosition() - rectangle.getSize() / 2.f;
+
+			else if (cell == 'S') {
 				sf::Vector2f enemyPos(
-					rectTopLeft.x + j * cellSize + cellSize / 2.f,
-					rectTopLeft.y + i * cellSize + cellSize / 2.f
+					currentLevel.bounds.getPosition().x - currentLevel.bounds.getSize().x / 2.f + j * cellSize + cellSize / 2.f,
+					currentLevel.bounds.getPosition().y - currentLevel.bounds.getSize().y / 2.f + i * cellSize + cellSize / 2.f
 				);
-				int enemyID = static_cast<int>(enemy.enemies.size()); // unique ID per enemy
-				enemy.enemies.emplace_back(static_cast<int>(enemyPos.x), static_cast<int>(enemyPos.y), enemyID, Enemy::Type::Oscillating);
-				// Change the color to pink
-				enemy.enemies.back().shape.setFillColor(sf::Color(255, 105, 180)); // RGB pink
+				int enemyID = static_cast<int>(currentLevel.enemies.size());
+				currentLevel.enemies.emplace_back(enemyPos, enemyID, Enemy::Type::Oscillating);
+				currentLevel.enemies.back().setColor(sf::Color(255, 105, 180)); // pink
 			}
+
 			
 		}
 	}
