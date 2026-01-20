@@ -31,6 +31,7 @@
 #include "Items.hpp"
 #include <memory>
 #include "Level.hpp"
+#include "LevelBuilder.hpp"
 
 
 
@@ -160,13 +161,6 @@ bool openParticleSim = false;
 // Particle physics solver
 Solver particleSolver;
 
-// Map dimensions
-int rows = 0;
-int cols = 0;
-
-// Tile map data
-char** map = nullptr;
-
 // Collection of walls for cave collision detection for the player
 std::vector<class Wall> walls;
 
@@ -174,23 +168,15 @@ std::vector<class Wall> walls;
 Player playa(20.f, 20.f);
 
 // ------------------- Function declarations -------------------
-void start_splash_screen(Level& currentLevel);
-void startup_routines(Level& currentLevel, Enemy& enemies);
+void start_splash_screen(Level& currentLevel); 
 void quit_routines(Level& currentLevel);
-void load_level(Level& currentlevel, Enemy& enemy);
 InputAction read_input(char*, Level& currentLevel);
 void handleAbortMission(Level& currentLevel, Enemy& enemy);
 void render_screen(Level& currentLevel, Enemy& enemy);
-void resetMap(Level& currentLevel, Enemy& enemy);
 
 // ------------------- Main -------------------
 char input;
-/****************************************************************
- *
- * MAIN
- * main function contains merely function calls to various routines and the main game loop
- *
- ****************************************************/
+
 int main(void)
 {
 	Level currentLevel;
@@ -199,8 +185,11 @@ int main(void)
 	// Show splash screen and instructions
 	start_splash_screen(currentLevel);
 
-	// Initial game setup (load level, spawn objects, etc.)
-	startup_routines(currentLevel, enemy);
+
+	// Load the level (reads map and spawns objects)
+	currentLevel.load(playa, enemy, particleSolver);
+
+
 
 	// IMPORTANT NOTE: do not exit program without cleanup
 	while (true) {
@@ -214,7 +203,8 @@ int main(void)
 			return 0;
 
 		case InputAction::RestartLevel:
-			resetMap(currentLevel, enemy);
+			currentLevel.load(playa, enemy, particleSolver);
+
 			break;
 
 		case InputAction::AbortMission:
@@ -235,78 +225,6 @@ int main(void)
 	return 0;
 }
 
-
- /****************************************************************
-  * FUNCTION load_level
-  * Loads a map file and initializes all map-related data.
-  ****************************************************************/
-void load_level(Level& currentLevel, Enemy& enemy)
-{
-	// Reset player and collected treasures
-	playa.reset();
-	currentLevel.resetCollectedTreasures();
-
-	// Free old map memory
-	if (map != nullptr) {
-		for (int i = 0; i < rows; ++i)
-			delete[] map[i];
-		delete[] map;
-		map = nullptr;
-	}
-
-	
-	currentLevel.items.clear();
-
-	// Clear enemies and walls
-	currentLevel.enemies.clear();
-	walls.clear();
-
-	rows = 0;
-	cols = 0;
-
-	// Determine map filename
-	std::string filename;
-	if (currentLevel.customMapFile) {
-		filename = currentLevel.customMapFileName;
-	}
-	else {
-		if (currentLevel.currentMapIndex < 0 ||
-			currentLevel.currentMapIndex >= currentLevel.mapFiles.size()) {
-			std::cerr << "Error: invalid map index\n";
-			return;
-		}
-		filename = currentLevel.mapFiles[currentLevel.currentMapIndex];
-	}
-
-	// Open map file
-	std::ifstream file(filename);
-	if (!file) {
-		std::cerr << "Failed to open map file: " << filename << std::endl;
-		return;
-	}
-
-	// Read file contents line by line
-	std::vector<std::string> contents;
-	std::string line;
-	while (getline(file, line))
-		contents.push_back(line);
-
-	if (contents.empty()) {
-		std::cerr << "Error: empty map file\n";
-		return;
-	}
-
-	// Allocate new map
-	rows = static_cast<int>(contents.size());
-	cols = static_cast<int>(contents[0].size());
-
-	map = new char* [rows];
-	for (int i = 0; i < rows; i++) {
-		map[i] = new char[cols];
-		for (int j = 0; j < cols; j++)
-			map[i][j] = contents[i][j];
-	}
-}
 
 /****************************************************************
  *
@@ -401,27 +319,27 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
 
 		if (choice == 'r') {
 			// Restart the current level
-			resetMap(currentLevel, enemy);
+			currentLevel.load(playa, enemy, particleSolver);
 			break;
 		}
 		else if (choice == 'p' && currentLevel.currentMapIndex > 0) {
 			// Go back to previous level
 			currentLevel.customMapFile = false;
 			currentLevel.currentMapIndex--;
-			resetMap(currentLevel, enemy);
+			currentLevel.load(playa, enemy, particleSolver);
 			break;
 		}
 		else if (choice == 'n' && canAdvance) {
 			// Advance to next level
 			currentLevel.customMapFile = false;
 			currentLevel.currentMapIndex++;
-			resetMap(currentLevel, enemy);
+			currentLevel.load(playa, enemy, particleSolver);
 			break;
 		}
 		else if (choice == 'q') {
 			// Quit to menu (stop rendering loop)
 			openParticleSim = false;
-			resetMap(currentLevel, enemy);
+			currentLevel.load(playa, enemy, particleSolver);
 			break;
 		}
 		else {
@@ -431,42 +349,6 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
 	}
 }
 
-
-/****************************************************************
- *
- * FUNCTION resetMap
- *
- * Clears all current level data and reloads the level cleanly.
- *
- **************************************************************/
-void resetMap(Level& currentLevel, Enemy& enemy)
-{
-	// Reset player and level progress
-	playa.reset();
-	currentLevel.resetCollectedTreasures();
-
-	// Free dynamic map memory
-	if (map != nullptr) {
-		for (int i = 0; i < rows; ++i)
-			delete[] map[i];
-		delete[] map;
-		map = nullptr;
-	}
-
-
-	currentLevel.items.clear();
-
-	// Clear enemies and walls
-	currentLevel.enemies.clear();
-	walls.clear();
-
-	// Reset map dimensions
-	rows = 0;
-	cols = 0;
-
-	// Reinitialize level
-	startup_routines(currentLevel, enemy);
-}
 
 
 /****************************************************************
@@ -664,7 +546,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 					});
 				hof.display();
 
-				resetMap(currentLevel, enemy);
+				currentLevel.load(playa, enemy, particleSolver);
 			}
 			else {
 				currentLevel.customMapFile = false;
@@ -673,7 +555,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 				currentLevel.currentMapIndex++;
 				openParticleSim = false;
 				window.close();
-				resetMap(currentLevel, enemy);
+				currentLevel.load(playa, enemy, particleSolver);
 			}
 		}
 
@@ -747,136 +629,7 @@ void start_splash_screen(Level& currentLevel)///// still need to add more instru
 	}
 }
 
-/****************************************************************
- *
- * FUNCTION startup_routines
- *
- * Function performs any tasks necessary to set up a game
- * May contain game load dialogue, new player/game dialogue, level loading, random inits, whatever else
- *
- * At first week, this could be suitable place to load level map.
- *
- * **************************************************************/
-void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO SFML SCREEN
-{
 
-	// Clear old particles
-	particleSolver.getObjects().clear();
-	
-	int spawn_x = 0;
-	int spawn_y = 0;
-	// Load the map first
-	
-	load_level(currentLevel, enemy); // or ask user for filename
-
-	unsigned int width = 840;
-	unsigned int height = 840;
-
-	// rectangle will be adjusted in load_level based on 'x' tiles
-	currentLevel.bounds.setFillColor(sf::Color::Black);
-	currentLevel.bounds.setOutlineThickness(5.0f);
-	currentLevel.bounds.setOutlineColor(sf::Color::Blue);
-	
-	playa.setFillColor(sf::Color::Green);
-
-	
-	// loop through the map to spawn particles and adjust rectangle
-	
-	float cellSize = 20.f; // how much space each charachter will create
-	int particlesPerCell = 3; // how many particles per 'o' cell
-
-
-	for (int i = 0; i < rows; i++) { // For loop for rows
-		for (int j = 0; j < cols; j++) { // for loop for cols
-			char cell = map[i][j]; // assigning char coordinate to charachter called cell to check what to create out of it
-			float x = j * cellSize + cellSize / 2.f; // to get the exact corresponding coordinate in the screen we have to multiply it with the cellsize and to get to the center of that cell we have to add half of the size of cellsize
-			float y = i * cellSize + cellSize / 2.f; // same as the earlier but for i
-
-			if (cell == 'x') { // if the cell is oocupied by x we use rectangle to create the map boundaries
-				// Set world bounds for clamping
-				currentLevel.bounds.setSize(sf::Vector2f(cols * cellSize, rows * cellSize));
-				currentLevel.bounds.setOrigin(currentLevel.bounds.getSize() / 2.f);
-				currentLevel.bounds.setPosition(sf::Vector2f(width / 2.f, height / 2.f));
-
-				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
-
-				sf::Vector2f wallPos(
-					rectTopLeft.x + j * cellSize + cellSize / 2.f,
-					rectTopLeft.y + i * cellSize + cellSize / 2.f
-				);
-				walls.emplace_back(wallPos.x, wallPos.y, cellSize, cellSize);
-
-			}
-			else if (cell == 'B') { // Hydra Mineral
-				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
-				sf::Vector2f itemPos(
-					rectTopLeft.x + j * cellSize + cellSize / 2.f,
-					rectTopLeft.y + i * cellSize + cellSize / 2.f
-				);
-				currentLevel.items.push_back(std::make_unique<HydraMineral>(itemPos));
-			}
-			else if (cell == 'O') { // Oxygen
-				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft = currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
-
-				sf::Vector2f itemPos(
-					rectTopLeft.x + j * cellSize + cellSize / 2.f,
-					rectTopLeft.y + i * cellSize + cellSize / 2.f
-				);
-
-				currentLevel.items.push_back(std::make_unique<Oxygen>(itemPos));
-			}
-
-			else if (cell == 'o') { //if the cell is o we spawn int particlesPerCell amount of particles currently 4 randomly with in the boundaries
-				for (int p = 0; p < particlesPerCell; p++) {
-					// small random offset within the cell
-					float offsetX = static_cast<float>(rand() % static_cast<int>(cellSize - 4)) - (cellSize / 2.f - 2.f);
-					float offsetY = static_cast<float>(rand() % static_cast<int>(cellSize - 4)) - (cellSize / 2.f - 2.f);
-
-					particleSolver.addObject(sf::Vector2f(x + offsetX, y + offsetY), 7.f);
-				}
-			}
-			else if (cell == 'P') { // Player spawn
-				spawn_x = i;
-				spawn_y = j;
-
-				// rectangle top-left position in window coordinates
-				sf::Vector2f rectTopLeft =
-					currentLevel.bounds.getPosition() - currentLevel.bounds.getSize() / 2.f;
-
-				// Place player in the center of the P-cell
-				float cellSize = 20.f;
-				playa.setPosition(sf::Vector2f(
-					rectTopLeft.x + spawn_y * cellSize + cellSize / 2.f,
-					rectTopLeft.y + spawn_x * cellSize + cellSize / 2.f
-				));
-			}
-
-			else if (cell == 'E') {
-				sf::Vector2f enemyPos(
-					currentLevel.bounds.getPosition().x - currentLevel.bounds.getSize().x / 2.f + j * cellSize + cellSize / 2.f,
-					currentLevel.bounds.getPosition().y - currentLevel.bounds.getSize().y / 2.f + i * cellSize + cellSize / 2.f
-				);
-				int enemyID = static_cast<int>(currentLevel.enemies.size());
-				currentLevel.enemies.emplace_back(enemyPos, enemyID, Enemy::Type::Moving);
-			}
-
-			else if (cell == 'S') {
-				sf::Vector2f enemyPos(
-					currentLevel.bounds.getPosition().x - currentLevel.bounds.getSize().x / 2.f + j * cellSize + cellSize / 2.f,
-					currentLevel.bounds.getPosition().y - currentLevel.bounds.getSize().y / 2.f + i * cellSize + cellSize / 2.f
-				);
-				int enemyID = static_cast<int>(currentLevel.enemies.size());
-				currentLevel.enemies.emplace_back(enemyPos, enemyID, Enemy::Type::Oscillating);
-				currentLevel.enemies.back().setColor(sf::Color(255, 105, 180)); // pink
-			}
-
-			
-		}
-	}
-	
-}
 
 
 /****************************************************************
@@ -888,25 +641,28 @@ void startup_routines(Level& currentLevel, Enemy& enemy) /// CHANGING MAP TO TO 
  * **************************************************************/
 void quit_routines(Level& currentLevel)
 {
-
-	// (*) ... the memory should be free'ed here at latest.
-
 	// Free dynamically allocated map memory
-		if (map != nullptr) {
-			for (int i = 0; i < rows; ++i) {
-				delete[] map[i];   // delete each row
-			}
-			delete[] map;          // delete the array of pointers
-			map = nullptr;         // good practice to avoid dangling pointer
-		}
+	currentLevel.freeMap();
 
-		
-		currentLevel.items.clear();
+	// Clear items
+	currentLevel.items.clear();
 
-		// Clear walls vector (automatic cleanup)
-		walls.clear();
+	// Clear enemies
+	currentLevel.enemies.clear();
 
-	std::cout << "\n" << "BYE! Welcome back soon." << "\n";
+	// Clear walls vector (global)
+	walls.clear();
+
+	// Clear particle solver objects
+	particleSolver.getObjects().clear();
+
+	// Reset map indices
+	currentLevel.currentMapIndex = 0;
+
+	// Reset player (optional)
+	playa.reset();
+
+	std::cout << "\nBYE! Welcome back soon.\n";
 }
 
 

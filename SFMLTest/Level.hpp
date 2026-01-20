@@ -3,21 +3,20 @@
 #include <vector>
 #include <string>
 #include <memory>
-
 #include <SFML/Graphics.hpp>
 
 #include "Item.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
+#include "Solver.hpp"
 
-// ------------------- Level -------------------
-// Handles level data, maps, and collectibles
+
 class Level {
 public:
     bool customMapFile = false;
     std::string customMapFileName;
 
-    sf::RectangleShape bounds; // world boundary rectangle
+    sf::RectangleShape bounds;
     std::vector<Enemy> enemies;
     std::vector<std::unique_ptr<Item>> items;
 
@@ -25,11 +24,17 @@ public:
     int currentMapIndex = 0;
     bool requestCloseRender = false;
 
-    // Treasure helpers
+    char** map = nullptr;
+    int rows = 0;
+    int cols = 0;
+
+    void load(Player& playa, Enemy& enemy, Solver& particleSolver);
+    void reset(Player& playa, Enemy& enemy, Solver& particleSolver);
+    void freeMap();
+
     int getTotalTreasures() const;
     int getCollectedTreasures() const;
     void resetCollectedTreasures();
 
-    // Access player's total treasure count
     int& addCollectedToTotal(Player& playa);
 };
