@@ -8,8 +8,7 @@
 // NOTE: This project uses SFML (Graphics, Window) and requires linking against the SFML libraries.
 // Tested with SFML3.0.0 and C++17
 
-#include <stdio.h>
-#include <stdlib.h>
+
 #include <string>
 #include <iostream>
 #include <SFML/Graphics.hpp>
@@ -17,7 +16,6 @@
 #include <vector>
 #include <cmath>
 #include <fstream>
-#include <unordered_map>
 #include <optional>
 #include <sstream>
 #include "Player.hpp"
@@ -32,6 +30,9 @@
 #include <memory>
 #include "Level.hpp"
 #include "LevelBuilder.hpp"
+#include "HallOfFame.hpp"
+#include "GameData.hpp"
+
 
 
 
@@ -49,166 +50,55 @@ enum class InputAction {
 	RestartLevel,
 	AbortMission
 };
-/****************************************************************
- *
- * STRUCT HallOfFameEntry
- *
- * Represents a single saved player record.
- * Stored in a text file and loaded at runtime.
- *
- **************************************************************/
-struct HallOfFameEntry {
-	std::string name;
-	int levelIndex;
-	int treasuresCollected;
-	int deaths;
-
-	HallOfFameEntry(
-		const std::string& n = "",
-		int lvl = 0,
-		int treas = 0,
-		int d = 0.f)
-		: name(n), levelIndex(lvl),
-		treasuresCollected(treas), deaths(d) {
-	}
-};
-
-/****************************************************************
- *
- * CLASS HallOfFame
- *
- * Handles loading, saving, appending, and displaying
- * persistent player statistics.
- *
- * Data format:
- * name,levelIndex,treasuresCollected,deaths
- *
- **************************************************************/
-class HallOfFame {
-public:
-	std::vector<HallOfFameEntry> entries;
-	std::string filename = "hall_of_fame.txt";
-
-	// Load all entries from file
-	void load() {
-		entries.clear();
-		std::ifstream file(filename);
-		if (!file.is_open()) return;
-
-		std::string line;
-		while (std::getline(file, line)) {
-			std::istringstream iss(line);
-
-			std::string name;
-			std::string levelStr, treasuresStr, deathsStr;
-
-			if (std::getline(iss, name, ',') &&
-				std::getline(iss, levelStr, ',') &&
-				std::getline(iss, treasuresStr, ',') &&
-				std::getline(iss, deathsStr, ',')) {
-
-				entries.push_back({
-					name,
-					std::stoi(levelStr),
-					std::stoi(treasuresStr),
-					std::stoi(deathsStr)
-					});
-			}
-		}
-	}
-
-	// Save all entries (overwrite)
-	void save() {
-		std::ofstream file(filename);
-		if (!file.is_open()) return;
-
-		for (auto& entry : entries) {
-			file << entry.name << "," << entry.levelIndex << ","
-				<< entry.treasuresCollected << "," << entry.deaths << "\n";
-		}
-	}
-
-	// Add a single entry and append it to file
-	void addEntry(const HallOfFameEntry& entry) {
-		entries.push_back(entry);
-
-		std::ofstream file(filename, std::ios::app);
-		if (!file.is_open()) return;
-
-		file << entry.name << "," << entry.levelIndex << ","
-			<< entry.treasuresCollected << "," << entry.deaths << "\n";
-	}
-
-	// Print leaderboard to console
-	void display() {
-		std::cout << "\n=== Hall of Fame Workers of The Month ===\n";
-		for (auto& e : entries) {
-			std::cout << e.name
-				<< " | Level " << e.levelIndex
-				<< " | Minerals: " << e.treasuresCollected
-				<< " | Deaths: " << e.deaths << "\n";
-		}
-		std::cout << "===========================\n";
-	}
-};
 
 
-
-// ------------------- Globals -------------------
-// Toggle for particle simulation mode
-bool openParticleSim = false;
-
-// Particle physics solver
-Solver particleSolver;
-
-// Collection of walls for cave collision detection for the player
-std::vector<class Wall> walls;
-
-// Global player instance
-Player playa(20.f, 20.f);
 
 // ------------------- Function declarations -------------------
-void start_splash_screen(Level& currentLevel); 
-void quit_routines(Level& currentLevel);
-InputAction read_input(char*, Level& currentLevel);
-void handleAbortMission(Level& currentLevel, Enemy& enemy);
-void render_screen(Level& currentLevel, Enemy& enemy);
+InputAction read_input(char* input, Level& currentLevel, GameData& gameData);
+void handleAbortMission(Level& currentLevel, Enemy& enemy, GameData& gameData);
+void render_screen( Level& currentLevel, Enemy& enemy, GameData& gameData);
+void start_splash_screen(Level& currentLevel, GameData& gameData);
+void quit_routines(Level& currentLevel, GameData& gameData);
+
 
 // ------------------- Main -------------------
 char input;
 
 int main(void)
 {
+	GameData gameData; // contains player, particleSolver, walls, isRendering
 	Level currentLevel;
 	Enemy enemy({ 200.f, 200.f }, 0);
 
 	// Show splash screen and instructions
-	start_splash_screen(currentLevel);
+	start_splash_screen(currentLevel, gameData);
 
 
 	// Load the level (reads map and spawns objects)
-	currentLevel.load(playa, enemy, particleSolver);
+	currentLevel.load(gameData, enemy); // Only pass the full GameData object
+
+
 
 
 
 	// IMPORTANT NOTE: do not exit program without cleanup
 	while (true) {
 		// Read player input (console-based)
-		InputAction action = read_input(&input, currentLevel);
+		InputAction action = read_input(&input, currentLevel, gameData);
 
 		// Handle input actions
 		switch (action) {
 		case InputAction::QuitGame:
-			quit_routines(currentLevel);
+			quit_routines(currentLevel, gameData);
 			return 0;
 
 		case InputAction::RestartLevel:
-			currentLevel.load(playa, enemy, particleSolver);
+			currentLevel.load(gameData, enemy);
 
 			break;
 
 		case InputAction::AbortMission:
-			handleAbortMission(currentLevel, enemy);
+			handleAbortMission(currentLevel, enemy, gameData);
 			break;
 
 		case InputAction::None:
@@ -216,12 +106,12 @@ int main(void)
 		}
 
 		// Launch SFML rendering loop when allowed
-		if (openParticleSim)
-			render_screen(currentLevel, enemy);
+		if (gameData.isRendering)
+			render_screen(currentLevel, enemy, gameData);
 	}
 
 	// Safety cleanup (normally unreachable)
-	quit_routines(currentLevel);
+	quit_routines(currentLevel, gameData);
 	return 0;
 }
 
@@ -234,10 +124,10 @@ int main(void)
  * If the player is dead, the mission is automatically aborted.
  *
  **************************************************************/
-InputAction read_input(char* input, Level& currentLevel)
+InputAction read_input(char* input, Level& currentLevel, GameData& gameData)
 {
 	// If player is alive, show available commands
-	if (!playa.isDead())
+	if (!gameData.player.isDead())
 		std::cout << "1 = continue | a = abort mission | q = quit\n";
 	else
 		// Dead player cannot continue, force abort
@@ -253,7 +143,7 @@ InputAction read_input(char* input, Level& currentLevel)
 	case 'q':
 		return InputAction::QuitGame;
 	case '1':
-		openParticleSim = true;   // allow rendering loop to start
+		gameData.isRendering = true;   // allow rendering loop to start
 		return InputAction::None;
 	case 'a':
 		return InputAction::AbortMission;
@@ -271,7 +161,7 @@ InputAction read_input(char* input, Level& currentLevel)
  * Allows restarting, moving between maps, or quitting to menu.
  *
  **************************************************************/
-void handleAbortMission(Level& currentLevel, Enemy& enemy)
+void handleAbortMission(Level& currentLevel, Enemy& enemy, GameData& gameData)
 {
 	// Count collected and total treasures
 	int collected = currentLevel.getCollectedTreasures();
@@ -287,11 +177,11 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
 	bool canAdvance =
 		percentage >= 0.5f &&
 		currentLevel.currentMapIndex < currentLevel.mapFiles.size() - 1 &&
-		!playa.isDead();
+		!gameData.player.isDead();
 
-	if (!playa.isDead()) {
+	if (!gameData.player.isDead()) {
 		// Add partial progress to total score
-		currentLevel.addCollectedToTotal(playa) += endResult;
+		currentLevel.addCollectedToTotal(gameData.player) += endResult;
 
 		// Show mission summary and options
 		std::cout << "\nMISSION ABORTED!\n";
@@ -304,7 +194,7 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
 	}
 	else {
 		// If player died, reset player state and show limited options
-		playa.reset();
+		gameData.player.reset();
 		std::cout << "Choose an option:\n";
 		std::cout << "r = restart current map\n";
 		std::cout << "p = previous map (if any)\n";
@@ -319,27 +209,27 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
 
 		if (choice == 'r') {
 			// Restart the current level
-			currentLevel.load(playa, enemy, particleSolver);
+			currentLevel.load(gameData, enemy);
 			break;
 		}
 		else if (choice == 'p' && currentLevel.currentMapIndex > 0) {
 			// Go back to previous level
 			currentLevel.customMapFile = false;
 			currentLevel.currentMapIndex--;
-			currentLevel.load(playa, enemy, particleSolver);
+			currentLevel.load(gameData, enemy);
 			break;
 		}
 		else if (choice == 'n' && canAdvance) {
 			// Advance to next level
 			currentLevel.customMapFile = false;
 			currentLevel.currentMapIndex++;
-			currentLevel.load(playa, enemy, particleSolver);
+			currentLevel.load(gameData, enemy);
 			break;
 		}
 		else if (choice == 'q') {
 			// Quit to menu (stop rendering loop)
-			openParticleSim = false;
-			currentLevel.load(playa, enemy, particleSolver);
+			gameData.isRendering = false;
+			currentLevel.load(gameData, enemy);
 			break;
 		}
 		else {
@@ -362,7 +252,7 @@ void handleAbortMission(Level& currentLevel, Enemy& enemy)
  * - Manages oxygen depletion and mission completion
  *
  **************************************************************/
-void render_screen(Level& currentLevel, Enemy& enemy)
+void render_screen(Level& currentLevel, Enemy& enemy, GameData& gameData)
 {
 	
 
@@ -375,10 +265,10 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 	window.setFramerateLimit(60);
 
 	// Set death callback once
-	playa.onDeath = [&]() {
+	gameData.player.onDeath = [&]() {
 		std::cout << "PLAYER DIED!\n";
-		playa.deaths++;
-		openParticleSim = false;
+		gameData.player.deaths++;
+		gameData.isRendering = false;
 		window.close();
 		};
 
@@ -402,7 +292,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 			// Window close event
 			if (event.is<sf::Event::Closed>()) {
 				window.close();
-				openParticleSim = false;
+				gameData.isRendering = false;
 				return; // return control to main()
 			}
 
@@ -414,7 +304,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 					static_cast<float>(mousePos.y)
 				);
 
-				for (auto& p : particleSolver.getObjects()) {
+				for (auto& p : gameData.particleSolver.getObjects()) {
 					sf::Vector2f dir = p.position - mousePosF;
 					float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
 					if (length != 0) dir /= length;
@@ -426,12 +316,12 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 
 			// Key pressed
 			if (auto* keyEvent = event.getIf<sf::Event::KeyPressed>()) {
-				playa.handleInput(keyEvent->code, true);
+				gameData.player.handleInput(keyEvent->code, true);
 			}
 
 			// Key released
 			if (auto* keyEvent = event.getIf<sf::Event::KeyReleased>()) {
-				playa.handleInput(keyEvent->code, false);
+				gameData.player.handleInput(keyEvent->code, false);
 			}
 		}
 
@@ -439,12 +329,12 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		 * OXYGEN HANDLING
 		 ********************/
 		if (oxygenClock.getElapsedTime().asSeconds() >= 1.0f) {
-			playa.oxygenTime -= 1.0f;
+			gameData.player.oxygenTime -= 1.0f;
 
 			// Clamp oxygen to zero and apply damage
-			if (playa.oxygenTime < 0.f) {
-				playa.oxygenTime = 0.f;
-				playa.takeDamage(2);
+			if (gameData.player.oxygenTime < 0.f) {
+				gameData.player.oxygenTime = 0.f;
+				gameData.player.takeDamage(2);
 			}
 
 			oxygenClock.restart();
@@ -453,14 +343,15 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		// Update window title with player status
 		window.setTitle(
 			"Holy Diver - Oxygen & Health: " +
-			std::to_string((int)playa.oxygenTime) + " s, " +
-			std::to_string((int)playa.health) + " hp"
+			std::to_string((int)gameData.player.oxygenTime) + " s, " +
+			std::to_string((int)gameData.player.health) + " hp"
 		);
 
 		/********************
 		 * UPDATE & RENDER
 		 ********************/
-		particleSolver.update(currentLevel.bounds);
+		gameData.particleSolver.update(currentLevel.bounds);
+
 
 		window.clear(sf::Color(20, 20, 40));
 
@@ -468,7 +359,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 		window.draw(currentLevel.bounds);
 
 		// Draw walls
-		for (auto& wall : walls) {
+		for (auto& wall : gameData.walls) {
 			wall.draw(window);
 		}
 
@@ -480,32 +371,32 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 
 		// Update and draw enemies
 		for (auto& e : currentLevel.enemies) {
-			e.update(walls, currentLevel.bounds);  // movement + collisions
-			e.updateAI(dt, playa);          // chasing, oscillation, damage
+			e.update(gameData.walls, currentLevel.bounds);  // movement + collisions
+			e.updateAI(dt, gameData.player);          // chasing, oscillation, damage
 			e.draw(window);                 // render
 		}
 
 
 		// Draw particles
-		for (Particle& p : particleSolver.getObjects())
+		for (Particle& p : gameData.particleSolver.getObjects())
 			window.draw(p.shape);
 
-		particleSolver.drawGrid(currentLevel.bounds, window);
+		gameData.particleSolver.drawGrid(currentLevel.bounds, window);
 
 		// Update player physics and collisions
-		playa.update(walls, currentLevel.bounds);
+		gameData.player.update(gameData.walls, currentLevel.bounds);
 
 		/********************
 		 * ITEM PICKUPS
 		 ********************/
 		for (auto& item : currentLevel.items) {
 			if (!item->collected) {
-				sf::Vector2f diff = item->position - playa.getPosition();
+				sf::Vector2f diff = item->position - gameData.player.getPosition();
 				float distance = std::sqrt(diff.x * diff.x + diff.y * diff.y);
 				float pickupRadius = 15.f;
 
 				if (distance < pickupRadius) {
-					item->applyEffect(playa);
+					item->applyEffect(gameData.player);
 					item->collected = true;
 				}
 			}
@@ -525,16 +416,16 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 					currentLevel.mapFiles.size() - 1);
 
 			if (lastLevel) {
-				openParticleSim = false;
+				gameData.isRendering = false;
 				window.close();
 
 				std::string playerName;
 				std::cout << "Congratulations! Thanks to you our company's shareholders' profits have tripled during the time of your diving. Enter your name for the company's Hall of Fame record: ";
 				std::cin >> playerName;
 
-				currentLevel.addCollectedToTotal(playa) += collectedCount;
-				int totalTreasures = currentLevel.addCollectedToTotal(playa);
-				int deathCount = playa.deaths;
+				currentLevel.addCollectedToTotal(gameData.player) += collectedCount;
+				int totalTreasures = currentLevel.addCollectedToTotal(gameData.player);
+				int deathCount = gameData.player.deaths;
 
 				HallOfFame hof;
 				hof.load();
@@ -546,21 +437,21 @@ void render_screen(Level& currentLevel, Enemy& enemy)
 					});
 				hof.display();
 
-				currentLevel.load(playa, enemy, particleSolver);
+				currentLevel.load(gameData, enemy);
 			}
 			else {
 				currentLevel.customMapFile = false;
 				std::cout << "All minerals collected! Thanks to you our company's profits are rising! Ready for next mission?\n";
-				currentLevel.addCollectedToTotal(playa) += collectedCount;
+				currentLevel.addCollectedToTotal(gameData.player) += collectedCount;
 				currentLevel.currentMapIndex++;
-				openParticleSim = false;
+				gameData.isRendering = false;
 				window.close();
-				currentLevel.load(playa, enemy, particleSolver);
+				currentLevel.load(gameData, enemy);
 			}
 		}
 
 		// Draw player last (on top)
-		playa.draw(window);
+		gameData.player.draw(window);
 
 		window.display();
 	}
@@ -573,7 +464,7 @@ void render_screen(Level& currentLevel, Enemy& enemy)
  *
  * **************************************************************/
 
-void start_splash_screen(Level& currentLevel)///// still need to add more instructions
+void start_splash_screen(Level& currentLevel, GameData& gameData)///// still need to add more instructions
 {
 	char input;
 	/* this function to display any title information at startup, may include instructions or fancy ASCII-graphics */
@@ -603,8 +494,7 @@ void start_splash_screen(Level& currentLevel)///// still need to add more instru
 	std::cout <<	"Your mission : Locate Hydra Minerals(yellow) and Oxy Minerals(white) while avoiding dangerous underwater creatures (red & pink). Do not underestimate the dangers of the ocean. They say some of the creatures down there can go through the cave walls. We are in the creatures' territories. And remember... sometimes the smartest move is not to move at all.\n";
 	std::cout << "\n";
 	std::cout << "\n";
-	HallOfFame Hof;
-	Hof.filename = "hall_of_fame.txt";
+	HallOfFame Hof ("hall_of_fame.txt");
 	Hof.load();
 	Hof.display();
 	std::cout << "Move with WASD, click with mouse to see in the depths and when you decide to quit remember to close the map window first and input q. You can see your oxygen level and health on the top right corner of the map window. You can add your own custom map, but if you load a custom map remember to quit and start the application over before going back to the original game levels. Loading your custom map is only possible in the beginning of the game. \n";
@@ -617,7 +507,7 @@ void start_splash_screen(Level& currentLevel)///// still need to add more instru
 	std::cout << ">>>";  std::cin >> input;
 
 	if (input == 'y' || input == 'Y') {
-		openParticleSim = true;
+		gameData.isRendering = true;
 		return;
 	}
 	if (input == 'm' || input == 'M')
@@ -639,7 +529,7 @@ void start_splash_screen(Level& currentLevel)///// still need to add more instru
  * function performs any routines necessary at program shut-down, such as freeing memory or storing data files
  *
  * **************************************************************/
-void quit_routines(Level& currentLevel)
+void quit_routines(Level& currentLevel, GameData& gameData)
 {
 	// Free dynamically allocated map memory
 	currentLevel.freeMap();
@@ -651,16 +541,16 @@ void quit_routines(Level& currentLevel)
 	currentLevel.enemies.clear();
 
 	// Clear walls vector (global)
-	walls.clear();
+	gameData.walls.clear();
 
 	// Clear particle solver objects
-	particleSolver.getObjects().clear();
+	gameData.particleSolver.getObjects().clear();
 
 	// Reset map indices
 	currentLevel.currentMapIndex = 0;
 
 	// Reset player (optional)
-	playa.reset();
+	gameData.player.reset();
 
 	std::cout << "\nBYE! Welcome back soon.\n";
 }

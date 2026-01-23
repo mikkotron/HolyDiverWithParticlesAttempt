@@ -1,9 +1,8 @@
 #include "Level.hpp"
-#include <fstream>    // std::ifstream, std::getline
-#include <iostream>   // std::cerr
+#include <fstream>
+#include <iostream>
 #include "LevelBuilder.hpp"
-#include "Wall.hpp"
-extern std::vector<Wall> walls;
+
 // ------------------- Treasure helpers -------------------
 
 int Level::getTotalTreasures() const {
@@ -27,8 +26,8 @@ void Level::resetCollectedTreasures() {
 
 // ------------------- Player interaction -------------------
 
-int& Level::addCollectedToTotal(Player& playa) {
-    return playa.totalTreasuresCollected;
+int& Level::addCollectedToTotal(Player& player) {
+    return player.totalTreasuresCollected;
 }
 
 // ------------------- Level load delete and reset -------------------
@@ -49,10 +48,13 @@ void Level::freeMap()
     enemies.clear();
     items.clear();
 }
-void Level::load(Player& playa, Enemy& enemy, Solver& particleSolver)
+
+// ------------------- Updated functions -------------------
+
+void Level::load(GameData& gameData, Enemy& enemy)
 {
     // Reset player & treasures
-    reset(playa, enemy, particleSolver);
+    reset(gameData, enemy);
 
     // Determine filename
     std::string filename;
@@ -94,21 +96,22 @@ void Level::load(Player& playa, Enemy& enemy, Solver& particleSolver)
             map[i][j] = contents[i][j];
     }
 
-    LevelBuilder::build(*this, enemy, particleSolver);
-
+    // Build level using GameData
+    LevelBuilder::build(*this, enemy, gameData);
 }
-void Level::reset(Player& playa, Enemy& enemy, Solver& particleSolver)
+
+void Level::reset(GameData& gameData, Enemy& enemy)
 {
-    // Only reset player & treasures
-    playa.reset();
+    // Reset player & treasures
+    gameData.player.reset();
     resetCollectedTreasures();
 
-
+    // Free previous map
     freeMap();
+
     // Clear walls/items/enemies/particles
-    walls.clear();
+    gameData.walls.clear();
     enemies.clear();
     items.clear();
-    particleSolver.getObjects().clear();
-
+    gameData.particleSolver.getObjects().clear();
 }

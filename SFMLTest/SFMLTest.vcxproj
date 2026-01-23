@@ -135,6 +135,7 @@
   <ItemGroup>
     <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Entity.cpp" />
+    <ClCompile Include="HallOfFame.cpp" />
     <ClCompile Include="Item.cpp" />
     <ClCompile Include="Level.cpp" />
     <ClCompile Include="LevelBuilder.cpp" />
@@ -148,6 +149,9 @@
   <ItemGroup>
     <ClInclude Include="Enemy.hpp" />
     <ClInclude Include="Entity.hpp" />
+    <ClInclude Include="GameData.hpp" />
+    <ClInclude Include="HallOfFame.hpp" />
+    <ClInclude Include="HallOfFameEntry.hpp" />
     <ClInclude Include="Item.hpp" />
     <ClInclude Include="Items.hpp" />
     <ClInclude Include="Level.hpp" />

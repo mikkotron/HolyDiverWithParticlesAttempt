@@ -2,31 +2,26 @@
 #include "Items.hpp"
 #include "Solver.hpp"
 #include "Wall.hpp"
+#include "GameData.hpp"  // <- include the GameData struct
 
 #include <fstream>
 #include <cstdlib> // rand()
-#include <cstdlib> // rand()
-
-// External systems (as in your project)
-extern Solver particleSolver;
-extern std::vector<Wall> walls;
-extern Player playa;
 
 // ----------------------------------------------------
 
-void LevelBuilder::build(Level& level, Enemy& enemy, Solver& particleSolver)
+void LevelBuilder::build(Level& level, Enemy& enemy, GameData& gameData)
 {
-    clearWorldState(particleSolver);
+    clearWorldState(gameData);
     setupBounds(level);
-    parseMap(level, enemy, particleSolver);
+    parseMap(level, enemy, gameData);
 }
 
 // ----------------------------------------------------
 
-void LevelBuilder::clearWorldState(Solver& particleSolver)
+void LevelBuilder::clearWorldState(GameData& gameData)
 {
-    particleSolver.getObjects().clear();
-    walls.clear();
+    gameData.particleSolver.getObjects().clear();
+    gameData.walls.clear();
 }
 
 // ----------------------------------------------------
@@ -45,7 +40,6 @@ void LevelBuilder::setupBounds(Level& level)
     level.bounds.setOrigin(level.bounds.getSize() / 2.f);
     level.bounds.setPosition(sf::Vector2f(width / 2.f, height / 2.f));
 
-
     level.bounds.setFillColor(sf::Color::Black);
     level.bounds.setOutlineThickness(5.f);
     level.bounds.setOutlineColor(sf::Color::Blue);
@@ -53,7 +47,7 @@ void LevelBuilder::setupBounds(Level& level)
 
 // ----------------------------------------------------
 
-void LevelBuilder::parseMap(Level& level, Enemy& enemy, Solver& particleSolver)
+void LevelBuilder::parseMap(Level& level, Enemy& enemy, GameData& gameData)
 {
     const float cellSize = 20.f;
     const int particlesPerCell = 3;
@@ -67,11 +61,11 @@ void LevelBuilder::parseMap(Level& level, Enemy& enemy, Solver& particleSolver)
 
             switch (cell)
             {
-            case 'x': spawnWall(pos, cellSize); break;
+            case 'x': spawnWall(gameData, pos, cellSize); break;
             case 'B': level.items.push_back(std::make_unique<HydraMineral>(pos)); break;
             case 'O': level.items.push_back(std::make_unique<Oxygen>(pos)); break;
-            case 'o': spawnParticles(particleSolver, pos, particlesPerCell); break;
-            case 'P': playa.setPosition(pos); break;
+            case 'o': spawnParticles(gameData, pos, particlesPerCell); break;
+            case 'P': gameData.player.setPosition(pos); break;
             case 'E': spawnEnemy(level, pos, Enemy::Type::Moving); break;
             case 'S': spawnEnemy(level, pos, Enemy::Type::Oscillating); break;
             default: break;
@@ -99,9 +93,9 @@ sf::Vector2f LevelBuilder::cellToWorld(
 
 // ----------------------------------------------------
 
-void LevelBuilder::spawnWall(const sf::Vector2f& pos, float size)
+void LevelBuilder::spawnWall(GameData& gameData, const sf::Vector2f& pos, float size)
 {
-    walls.emplace_back(pos.x, pos.y, size, size);
+    gameData.walls.emplace_back(pos.x, pos.y, size, size);
 }
 
 // ----------------------------------------------------
@@ -117,14 +111,14 @@ void LevelBuilder::spawnEnemy(Level& level, const sf::Vector2f& pos, Enemy::Type
 
 // ----------------------------------------------------
 
-void LevelBuilder::spawnParticles(Solver& particleSolver, const sf::Vector2f& pos, int count)
+void LevelBuilder::spawnParticles(GameData& gameData, const sf::Vector2f& pos, int count)
 {
     for (int i = 0; i < count; ++i)
     {
         float offsetX = static_cast<float>(rand() % 16 - 8);
         float offsetY = static_cast<float>(rand() % 16 - 8);
 
-        particleSolver.addObject(
+        gameData.particleSolver.addObject(
             { pos.x + offsetX, pos.y + offsetY },
             7.f
         );

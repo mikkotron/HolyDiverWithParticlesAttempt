@@ -8,8 +8,7 @@
 #include "Item.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
-#include "Solver.hpp"
-
+#include "GameData.hpp" // <- include GameData
 
 class Level {
 public:
@@ -28,13 +27,14 @@ public:
     int rows = 0;
     int cols = 0;
 
-    void load(Player& playa, Enemy& enemy, Solver& particleSolver);
-    void reset(Player& playa, Enemy& enemy, Solver& particleSolver);
+    // ------------------- Updated to use GameData -------------------
+    void load(GameData& gameData, Enemy& enemy);
+    void reset(GameData& gameData, Enemy& enemy);
     void freeMap();
 
     int getTotalTreasures() const;
     int getCollectedTreasures() const;
     void resetCollectedTreasures();
 
-    int& addCollectedToTotal(Player& playa);
+    int& addCollectedToTotal(Player& player);
 };
