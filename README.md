@@ -1,0 +1,4 @@
+This was a school assigment to learn object oriented programming from fall 2025. I wanted to connect it to learning about physics simulating and to learn how to work with SFML library. It was an insightful experience in how hard it is to
+how difficult it is to maintain a larger project by yourself. The game itself is a very simple Pacman like 2D game with simple enemies and a particle system ball pit that the player has to move by clicking with mouse to be able to see under
+water. Player is working for company to gather minerals from deepest parts of the ocean and as all the minerals are gathered the level ends. It is possible to create your own levels and upload them into the game by creating a textfile with x = wall, o particel, E = enemy 
+that follows, S = enemy that moves back and fort, P = player, O = oxygen mineral, B = hydra mineral. It also saves a textfile of all the players that has completed the game's 3 levels.
