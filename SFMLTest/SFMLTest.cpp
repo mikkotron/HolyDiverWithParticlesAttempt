@@ -75,15 +75,15 @@ int main(void)
 
 
 	// Load the level (reads map and spawns objects)
-	currentLevel.load(gameData, enemy); // Only pass the full GameData object
+	currentLevel.load(gameData, enemy);
 
 
 
 
 
-	// IMPORTANT NOTE: do not exit program without cleanup
+	
 	while (true) {
-		// Read player input (console-based)
+		// Read player input
 		InputAction action = read_input(&input, currentLevel, gameData);
 
 		// Handle input actions
@@ -522,13 +522,7 @@ void start_splash_screen(Level& currentLevel, GameData& gameData)///// still nee
 
 
 
-/****************************************************************
- *
- * FUNCTION quit_routines
- *
- * function performs any routines necessary at program shut-down, such as freeing memory or storing data files
- *
- * **************************************************************/
+
 void quit_routines(Level& currentLevel, GameData& gameData)
 {
 	// Free dynamically allocated map memory
