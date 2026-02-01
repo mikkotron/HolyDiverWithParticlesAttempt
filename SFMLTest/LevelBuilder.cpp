@@ -2,14 +2,14 @@
 #include "Items.hpp"
 #include "Solver.hpp"
 #include "Wall.hpp"
-#include "GameData.hpp"  // <- include the GameData struct
+#include "GameData.hpp"  
 
 #include <fstream>
 #include <cstdlib> // rand()
 
 // ----------------------------------------------------
 
-void LevelBuilder::build(Level& level, Enemy& enemy, GameData& gameData)
+void LevelBuilder::build(Level& level, Enemy& enemy, GameData& gameData) 
 {
     clearWorldState(gameData);
     setupBounds(level);
@@ -18,7 +18,7 @@ void LevelBuilder::build(Level& level, Enemy& enemy, GameData& gameData)
 
 // ----------------------------------------------------
 
-void LevelBuilder::clearWorldState(GameData& gameData)
+void LevelBuilder::clearWorldState(GameData& gameData) // clearing the earlier map 
 {
     gameData.particleSolver.getObjects().clear();
     gameData.walls.clear();
@@ -26,7 +26,7 @@ void LevelBuilder::clearWorldState(GameData& gameData)
 
 // ----------------------------------------------------
 
-void LevelBuilder::setupBounds(Level& level)
+void LevelBuilder::setupBounds(Level& level) 
 {
     const float cellSize = 20.f;
     const float width = 840.f;
@@ -45,7 +45,7 @@ void LevelBuilder::setupBounds(Level& level)
     level.bounds.setOutlineColor(sf::Color::Blue);
 }
 
-// ----------------------------------------------------
+// after reading the text file map putting each element on their right place on SMFL screen
 
 void LevelBuilder::parseMap(Level& level, Enemy& enemy, GameData& gameData)
 {
@@ -74,7 +74,7 @@ void LevelBuilder::parseMap(Level& level, Enemy& enemy, GameData& gameData)
     }
 }
 
-// ----------------------------------------------------
+
 
 sf::Vector2f LevelBuilder::cellToWorld(
     const Level& level,
@@ -91,14 +91,14 @@ sf::Vector2f LevelBuilder::cellToWorld(
     };
 }
 
-// ----------------------------------------------------
+
 
 void LevelBuilder::spawnWall(GameData& gameData, const sf::Vector2f& pos, float size)
 {
     gameData.walls.emplace_back(pos.x, pos.y, size, size);
 }
 
-// ----------------------------------------------------
+
 
 void LevelBuilder::spawnEnemy(Level& level, const sf::Vector2f& pos, Enemy::Type type)
 {
@@ -109,7 +109,7 @@ void LevelBuilder::spawnEnemy(Level& level, const sf::Vector2f& pos, Enemy::Type
         level.enemies.back().setColor(sf::Color(255, 105, 180));
 }
 
-// ----------------------------------------------------
+
 
 void LevelBuilder::spawnParticles(GameData& gameData, const sf::Vector2f& pos, int count)
 {

@@ -1,5 +1,5 @@
 #include "MathUtils.hpp"
-
+// making sure player and enemy wont get out from the map
 sf::Vector2f clampInsideRect(
     const sf::Vector2f& position,
     const sf::Vector2f& size,

@@ -3,7 +3,7 @@
 #include <iostream>
 #include "LevelBuilder.hpp"
 
-// ------------------- Treasure helpers -------------------
+// Treasure helpers
 
 int Level::getTotalTreasures() const {
     return static_cast<int>(items.size());
@@ -24,13 +24,13 @@ void Level::resetCollectedTreasures() {
     }
 }
 
-// ------------------- Player interaction -------------------
+// Player interaction 
 
 int& Level::addCollectedToTotal(Player& player) {
     return player.totalTreasuresCollected;
 }
 
-// ------------------- Level load delete and reset -------------------
+// Level load delete and reset
 
 void Level::freeMap()
 {
@@ -49,7 +49,7 @@ void Level::freeMap()
     items.clear();
 }
 
-// ------------------- Updated functions -------------------
+// Updated functions 
 
 void Level::load(GameData& gameData, Enemy& enemy)
 {

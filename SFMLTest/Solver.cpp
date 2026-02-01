@@ -2,7 +2,7 @@
 #include "Solver.hpp"
 #include <cmath>
 
-// -------------------- SpatialHashGrid --------------------
+//SpatialHashGrid dividing the particles in to smaller areas to check collisions
 Solver::SpatialHashGrid::SpatialHashGrid(float cellSize_) : cellSize(cellSize_) {}
 
 long long Solver::SpatialHashGrid::hash(int x, int y) const {
@@ -24,7 +24,7 @@ void Solver::SpatialHashGrid::clear() {
     grid.clear();
 }
 
-// -------------------- Solver --------------------
+// Solver
 Solver::Solver() = default;
 
 Particle& Solver::addObject(sf::Vector2f position, float radius) {
@@ -49,7 +49,7 @@ void Solver::update(const sf::RectangleShape& rect) {
         checkCollisionsSpatial(rect);
     }
 }
-
+// visualising grid
 void Solver::drawGrid(const sf::RectangleShape& rect, sf::RenderWindow& window) {
     float cellSize = hashGrid.cellSize;
     sf::RectangleShape cellOutline;
@@ -79,6 +79,7 @@ void Solver::applyGravity() {
         obj.applyAcceleration(gravity);
 }
 
+// checks grid cells inside the map area detecting distances between particles and if close enough psuhes them away
 void Solver::checkCollisionsSpatial(const sf::RectangleShape& rect) {
     sf::Vector2f rectTopLeft = rect.getPosition() - rect.getOrigin();
     sf::Vector2f rectBottomRight = rectTopLeft + rect.getSize();

@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include "HallOfFameEntry.hpp"
-
+//Loads saves and displays the players name and score and deaths 
 class HallOfFame {
 public:
     explicit HallOfFame(const std::string& file = "hall_of_fame.txt");

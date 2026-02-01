@@ -1,4 +1,4 @@
-// Particle.cpp
+
 #include "Particle.hpp"
 #include <cmath>
 

@@ -56,7 +56,7 @@ void Player::draw(sf::RenderWindow& window) const {
     window.draw(rect);
 }
 
-// Collision
+// checking Collision
 bool Player::checkCollision(const sf::RectangleShape& wallShape) {
     sf::Vector2f playerPos = rect.getPosition();
     sf::Vector2f playerHalf = rect.getSize() / 2.f;
@@ -66,7 +66,7 @@ bool Player::checkCollision(const sf::RectangleShape& wallShape) {
     return (std::abs(playerPos.x - wallPos.x) < (playerHalf.x + wallHalf.x)) &&
         (std::abs(playerPos.y - wallPos.y) < (playerHalf.y + wallHalf.y));
 }
-
+//resolving collision
 void Player::resolveCollisions(const std::vector<Wall>& walls) {
     sf::Vector2f playerPos = rect.getPosition();
     sf::Vector2f playerHalf = rect.getSize() / 2.f;

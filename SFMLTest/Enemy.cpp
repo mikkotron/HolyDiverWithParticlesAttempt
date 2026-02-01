@@ -1,12 +1,11 @@
 #include "Enemy.hpp"
-
 #include "Player.hpp"
 #include "Wall.hpp"
 #include "MathUtils.hpp"
 
 #include <cstdlib>
 #include <cmath>
-
+//Constructor
 Enemy::Enemy(sf::Vector2f startPos_, int id_, Type t)
     : type(t), id(id_), pos(startPos_), startPos(startPos_)
 {
@@ -16,7 +15,7 @@ Enemy::Enemy(sf::Vector2f startPos_, int id_, Type t)
     );
     shape.setPosition(pos);
 
-    // Random offset for moving enemies
+    // Random offset inside map for following enemies
     if (type == Type::Moving) {
         float maxOffset = 10.f;
         randomOffset = {
@@ -41,6 +40,7 @@ void Enemy::updateAI(float dt, Player& player)
 
     sf::Vector2f playerPos = player.getPosition();
 
+    // too types of enemies osciallting and following
     if (type == Type::Oscillating) {
         pos.y = startPos.y +
             std::sin(time * oscillationSpeed) * oscillationAmplitude;

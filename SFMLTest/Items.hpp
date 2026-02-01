@@ -2,7 +2,7 @@
 
 #include "Item.hpp"
 #include <algorithm>
-
+// classes for each collectible item and the effect functions
 class HydraMineral : public Item {
 public:
     explicit HydraMineral(sf::Vector2f pos)

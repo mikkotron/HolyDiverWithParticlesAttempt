@@ -8,8 +8,9 @@
 #include "Item.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
-#include "GameData.hpp" // <- include GameData
+#include "GameData.hpp" 
 
+// has data that each level needs and has the reset / free and and load functions
 class Level {
 public:
     bool customMapFile = false;

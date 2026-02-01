@@ -2,7 +2,7 @@
 
 #include "Level.hpp"
 #include "Enemy.hpp"
-#include "GameData.hpp" // <-- include GameData for player, walls, solver
+#include "GameData.hpp" 
 
 class LevelBuilder
 {
